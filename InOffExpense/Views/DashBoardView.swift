@@ -260,20 +260,17 @@ struct DashboardView: View {
                 }
             }
             .navigationTitle("In Off Expense")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showAddExpenseSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
         } detail: {
             switch selection {
             case .dashboard, .none:
                 ScrollView {
                     VStack(spacing: 20) {
+                        HStack(spacing: 12) {
+                            BudgetPillView(budget: viewModel.displayedBudget)
+                            SpentPillView(spent: viewModel.dailySpent)
+                        }
+                        .padding(.horizontal)
+                        
                         // Weekly Spend Chart
                         if !viewModel.displayedExpenses.isEmpty {
                             WeeklySpendChart(dailyTotals: calculateWeeklyTotals())
@@ -325,6 +322,17 @@ struct DashboardView: View {
         .sheet(isPresented: $showAddExpenseSheet) {
             ExpenseLoggingView()
                 .modelContainer(modelContext.container)
+        }
+        .toolbar {
+            if selection == .dashboard {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showAddExpenseSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
         }
         .task {
             viewModel.modelContext = modelContext

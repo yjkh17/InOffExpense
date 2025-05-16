@@ -15,30 +15,30 @@ struct WeeklySpendChart: View {
         dailyTotals.reduce(0) { $0 + $1.total }
     }
     
+    var maxTotal: Double {
+        dailyTotals.map(\.total).max() ?? 1000
+    }
+    
+    var averageTotal: Double {
+        dailyTotals.isEmpty ? 0 : weeklyTotal / Double(dailyTotals.count)
+    }
+    
+    private func yAxisTicks() -> [Double] {
+        let max = maxTotal * 1.2
+        let step = max / 4
+        return stride(from: 0, through: max, by: step).map { $0 }
+    }
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Weekly Total")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            
-            Text(String(format: "%.0f IQD", weeklyTotal))
-                .font(.title)
-                .fontWeight(.bold)
-                .foregroundStyle(.primary)
-            
-            Chart(dailyTotals) { total in
+        Chart {
+            ForEach(dailyTotals) { total in
                 LineMark(
                     x: .value("Day", total.date),
                     y: .value("Amount", total.total)
                 )
                 .interpolationMethod(.catmullRom)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.chartStart, .chartEnd],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .lineStyle(StrokeStyle(lineWidth: 2))
+                .foregroundStyle(Color.accentColor.opacity(0.8))
                 
                 AreaMark(
                     x: .value("Day", total.date),
@@ -47,28 +47,69 @@ struct WeeklySpendChart: View {
                 .interpolationMethod(.catmullRom)
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [.chartStart.opacity(0.3), .chartEnd.opacity(0.1)],
-                        startPoint: .leading,
-                        endPoint: .trailing
+                        colors: [Color.accentColor.opacity(0.2), Color.accentColor.opacity(0.05)],
+                        startPoint: .top,
+                        endPoint: .bottom
                     )
                 )
+                
+                PointMark(
+                    x: .value("Day", total.date),
+                    y: .value("Amount", total.total)
+                )
+                .annotation(position: .top, spacing: 2) {
+                    Text("\(Int(total.total)) IQD")
+                        .font(.caption2.bold())
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(Color.accentColor.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                .foregroundStyle(Color.accentColor)
+                .symbolSize(30)
             }
-            .frame(height: 100)
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .day)) { _ in
-                    AxisValueLabel(format: .dateTime.weekday(.narrow))
+            
+            if !dailyTotals.isEmpty {
+                RuleMark(y: .value("Average", averageTotal))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                    .foregroundStyle(.orange.opacity(0.5))
+                    .annotation(position: .leading) {
+                        Text("Avg: \(Int(averageTotal)) IQD")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
+            }
+        }
+        .chartYScale(domain: 0...maxTotal * 1.2)
+        .chartXAxis {
+            AxisMarks(values: .stride(by: .day)) { value in
+                if let date = value.as(Date.self) {
+                    AxisValueLabel {
+                        Text(date, format: .dateTime.weekday(.narrow))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                AxisTick(stroke: StrokeStyle(lineWidth: 1))
+                    .foregroundStyle(.secondary.opacity(0.3))
+                AxisGridLine()
+                    .foregroundStyle(.secondary.opacity(0.15))
+            }
+        }
+        .chartYAxis {
+            AxisMarks(values: yAxisTicks()) { value in
+                if let doubleValue = value.as(Double.self) {
+                    AxisValueLabel {
+                        Text("\(Int(doubleValue)) IQD")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    AxisGridLine()
+                        .foregroundStyle(.secondary.opacity(0.15))
                 }
             }
-            .chartYAxis {
-                AxisMarks(position: .leading)
-            }
         }
-        .padding()
-        .background(Color.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.12), radius: 2, y: 2)
-        .transaction { transaction in
-            transaction.animation = .spring()
-        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 4)
     }
-} 
+}

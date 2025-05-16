@@ -158,26 +158,17 @@ struct ExpenseLoggingView: View {
                                     
                                     modelContext.insert(newExpense)
                                     do {
-                                        // Use await if save is asynchronous.
                                         try modelContext.save()
+                                        handleDismiss()
                                     } catch {
-                                        DispatchQueue.main.async {
-                                            formError = "Failed to save the expense. Please try again: \(error.localizedDescription)"
-                                        }
+                                        formError = "Failed to save the expense. Please try again: \(error.localizedDescription)"
                                         print("Save error: \(error)")
-                                    }
-                                    // Dismiss the view after saving.
-                                    DispatchQueue.main.async {
-                                        handleDismiss()
-                                    }
-                                } else {
-                                    DispatchQueue.main.async {
-                                        handleDismiss()
                                     }
                                 }
                             }
                         }
                         .disabled(!isFormValid)
+                        .buttonStyle(.borderedProminent)
                     }
                 }
             }
@@ -209,7 +200,7 @@ struct ExpenseLoggingView: View {
     }
 
     private var isFormValid: Bool {
-        formError == nil
+        !trimmedSupplierName.isEmpty && amount != nil && (amount ?? 0) > 0
     }
 
     // MARK: - Saving Helper
