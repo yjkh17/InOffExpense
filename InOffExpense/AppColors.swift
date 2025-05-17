@@ -31,4 +31,4 @@ extension Color {
         case .other: return .otherCategory
         }
     }
-} 
+}

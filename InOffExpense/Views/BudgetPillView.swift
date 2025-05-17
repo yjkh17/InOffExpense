@@ -3,16 +3,19 @@ import SwiftUI
 /// Small capsule that shows the current available budget.
 struct BudgetPillView: View {
     let budget: Double
-    @State private var animateChange = false
-
-    private var validatedBudget: Double { max(0, budget) }
-
+    
+    private var formattedBudget: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: budget)) ?? String(format: "%.0f", budget)
+    }
+    
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "dollarsign.circle.fill")
                 .font(.body)
-
-            Text(validatedBudget, format: .number)
+            Text(formattedBudget)
                 .font(.body.bold())
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -28,16 +31,7 @@ struct BudgetPillView: View {
             )
         )
         .clipShape(Capsule())
-        .overlay(
-            Capsule().stroke(Color.white.opacity(0.5), lineWidth: 1)
-        )
+        .overlay(Capsule().stroke(Color.white.opacity(0.5), lineWidth: 1))
         .shadow(color: Color.purple.opacity(0.3), radius: 6, x: 3, y: 3)
-        .scaleEffect(animateChange ? 1.1 : 1.0)
-        .onChange(of: budget) { _, _ in
-            animateChange = true
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-                animateChange = false
-            }
-        }
     }
 }

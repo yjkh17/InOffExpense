@@ -7,9 +7,9 @@ struct ExpenseEditingView: View {
     @Environment(\.dismiss) private var dismiss
 
     @Bindable var expense: Expense
-
     @State private var originalAmount: Double
     @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var showCategoryPicker = false
 
     init(expense: Expense) {
         self.expense = expense
@@ -17,23 +17,59 @@ struct ExpenseEditingView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
-                Section(header: Text("Expense Info")) {
+                Section("Expense Info") {
                     TextField("Details", text: $expense.details)
+                    
                     TextField("Amount", value: $expense.amount, format: .number)
                         .keyboardType(.decimalPad)
                     
-                    // Custom binding for the date
                     DatePicker("Date",
-                               selection: Binding<Date>(
-                                   get: { expense.date },
-                                   set: { expense.date = $0 }
-                               ),
-                               displayedComponents: .date)
+                             selection: Binding<Date>(
+                                get: { expense.date },
+                                set: { expense.date = $0 }
+                             ),
+                             displayedComponents: .date)
+                    
+                    NavigationLink {
+                        List(ExpenseCategory.allCases, id: \.self) { category in
+                            Button {
+                                expense.category = category
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    Text(category.rawValue)
+                                    Spacer()
+                                    if category == expense.category {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(.blue)
+                                    }
+                                }
+                            }
+                        }
+                        .navigationTitle("Category")
+                        .navigationBarTitleDisplayMode(.inline)
+                    } label: {
+                        HStack {
+                            Text("Category")
+                            Spacer()
+                            Text(expense.category.rawValue)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    
+                    if let supplier = expense.supplier {
+                        HStack {
+                            Text("Supplier")
+                            Spacer()
+                            Text(supplier.name)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 
-                Section(header: Text("Photo (Optional)")) {
+                Section("Photo (Optional)") {
                     if let data = expense.photoData, let image = UIImage(data: data) {
                         Image(uiImage: image)
                             .resizable()
@@ -41,25 +77,27 @@ struct ExpenseEditingView: View {
                             .frame(maxHeight: 200)
                     }
                     PhotosPicker(expense.photoData == nil ? "Add Photo" : "Change Photo",
-                                 selection: $selectedPhotoItem,
-                                 matching: .images)
+                               selection: $selectedPhotoItem,
+                               matching: .images)
                         .onChange(of: selectedPhotoItem) { _, newItem in
-                            guard let newItem = newItem else { return }
-                            Task {
-                                if let data = try? await newItem.loadTransferable(type: Data.self) {
-                                    expense.photoData = data
+                            if let newItem {
+                                Task {
+                                    if let data = try? await newItem.loadTransferable(type: Data.self) {
+                                        expense.photoData = data
+                                    }
                                 }
                             }
                         }
                 }
             }
             .navigationTitle("Edit Expense")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { saveChanges() }
-                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { saveChanges() }
                 }
             }
         }
@@ -75,7 +113,6 @@ struct ExpenseEditingView: View {
 
         do {
             try modelContext.save()
-            // Post notification so the dashboard updates immediately.
             NotificationCenter.default.post(name: Notification.Name("ExpenseUpdated"), object: nil)
             dismiss()
         } catch {

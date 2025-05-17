@@ -1,136 +1,76 @@
 import SwiftUI
 import SwiftData
 
-private struct DeletedExpenseRecord {
-    let expense: Expense
-    let wasPaid: Bool
-    let budgetBeforeDelete: Double
-}
-
 @MainActor
 final class DashboardViewVM: ObservableObject {
-    @Published var searchText: String = ""
     @Published var showChart: Bool = false
     @Published var editingExpense: Expense?
-    @Published var displayedExpenses: [Expense] = []
+    @Published var selectedCategory: ExpenseCategory? = nil
+    @Published var dateRange: Date
     @Published var displayedBudget: Double = 0.0
-    @Published var showTopUpNotification = false
     @Published var showUndoBanner = false
     @Published var showFullScreenPhoto: Bool = false
     @Published var fullScreenPhoto: UIImage? = nil
-    @Published var selectedCategory: ExpenseCategory?
-    @Published var dateRange: Date = Date()
-
-    private static let dateFilterFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
+    @Published var weekOffset: Int = 0
+    @Published var showDailyReport = false
     
-    // Data collections
-    var budgets: [Budget] = []
-    var allExpenses: [Expense] = []
-    
-    // Reference to ModelContext and persistent storage info
-    var modelContext: ModelContext?
-    var lastDailyTopUpDate: Date?
-    
-    // Constants
-    let dailyTopUpAmount = 1_000_000.0
-    let batchSize = 20
-    
-    // Stack for undo operations
+    private let expenseService: ExpenseServiceProtocol
+    private let budgetService: BudgetServiceProtocol
     private var undoStack: [DeletedExpenseRecord] = []
     
-    // Computed property for today's spent amount
+    @Published var allExpenses: [Expense] = []
+    @Published var budgets: [Budget] = []
+    
+    init(expenseService: ExpenseServiceProtocol, budgetService: BudgetServiceProtocol) {
+        self.expenseService = expenseService
+        self.budgetService = budgetService
+        self._dateRange = Published(initialValue: Calendar.current.startOfDay(for: Date()))
+    }
+    
+    var filteredExpenses: [Expense] {
+        // Only filter by category, ignore date range for now
+        allExpenses.filter { expense in
+            selectedCategory == nil || expense.category == selectedCategory
+        }
+        .sorted { $0.date > $1.date }
+    }
+    
     var dailySpent: Double {
-        let today = Calendar.current.startOfDay(for: Date())
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
         return allExpenses
-            .filter { $0.isPaid && Calendar.current.startOfDay(for: $0.date) == today }
+            .filter { calendar.isDate($0.date, inSameDayAs: today) && $0.isPaid }
             .reduce(0) { $0 + $1.amount }
     }
     
-    // Filtered expenses based on search query
-    var filteredExpenses: [Expense] {
+    var todaysExpenses: [Expense] {
         let calendar = Calendar.current
-        return allExpenses.filter { expense in
-            let categoryMatch = selectedCategory == nil || expense.category == selectedCategory
-            let dateMatch = calendar.isDate(expense.date, inSameDayAs: dateRange)
-            return categoryMatch && dateMatch
-        }
+        let today = calendar.startOfDay(for: Date())
+        return allExpenses.filter { calendar.isDate($0.date, inSameDayAs: today) }
     }
     
-    // MARK: - Business Logic Methods
-    
-    func createDefaultBudgetIfNeeded() {
-        guard let context = modelContext else { return }
-        let descriptor = FetchDescriptor<Budget>()
-        guard (try? context.fetch(descriptor))?.isEmpty ?? true else { return }
-        
-        let defaultBudget = Budget(currentBudget: 1_000_000)
-        context.insert(defaultBudget)
+    func createDefaultBudgetIfNeeded() async {
         do {
-            try context.save()
-            displayedBudget = defaultBudget.currentBudget
-        } catch {
-            print("Error saving default budget: \(error)")
-        }
-    }
-    
-    func topUpBudgetDaily() {
-        guard let context = modelContext, let budget = budgets.first else { return }
-        let now = Date()
-        if let lastTopUp = lastDailyTopUpDate, Calendar.current.isDate(lastTopUp, inSameDayAs: now) {
-            return
-        }
-        withAnimation(.spring()) {
-            budget.currentBudget += dailyTopUpAmount
+            guard try budgetService.getCurrentBudget() == nil else { return }
+            let budget = try budgetService.createDefaultBudget()
             displayedBudget = budget.currentBudget
-        }
-        do {
-            try context.save()
-            lastDailyTopUpDate = now
-            showTopUpNotification = true
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                withAnimation(.spring()) {
-                    self?.showTopUpNotification = false
-                }
-            }
         } catch {
-            print("Error topping up budget: \(error)")
-        }
-    }
-    
-    func loadInitialExpenses() {
-        let allFiltered = filteredExpenses
-        displayedExpenses = Array(allFiltered.prefix(batchSize))
-    }
-    
-    func loadMoreIfNeeded(currentExpense: Expense) {
-        guard let last = displayedExpenses.last else { return }
-        if currentExpense.id == last.id {
-            let allFiltered = filteredExpenses
-            let nextIndex = displayedExpenses.count
-            let nextBatch = allFiltered.dropFirst(nextIndex).prefix(batchSize)
-            displayedExpenses.append(contentsOf: nextBatch)
+            print("Error creating default budget: \(error)")
         }
     }
     
     func deleteExpense(_ expense: Expense) {
-        guard let context = modelContext, let budget = budgets.first else { return }
+        guard let budget = budgets.first else { return }
         let wasPaid = expense.isPaid
         let currentBudget = budget.currentBudget
         
-        if expense.isPaid {
-            withAnimation(.spring()) {
+        do {
+            if expense.isPaid {
                 budget.currentBudget += expense.amount
                 displayedBudget = budget.currentBudget
             }
-        }
-        context.delete(expense)
-        do {
-            try context.save()
+            
+            try expenseService.deleteExpense(expense)
             let record = DeletedExpenseRecord(expense: expense, wasPaid: wasPaid, budgetBeforeDelete: currentBudget)
             undoStack.append(record)
             showUndoBanner = true
@@ -139,53 +79,76 @@ final class DashboardViewVM: ObservableObject {
         }
     }
     
-    func undoLastDelete() {
-        guard let record = undoStack.popLast(), let context = modelContext, let budget = budgets.first else { return }
-        if record.wasPaid {
-            withAnimation(.spring()) {
-                budget.currentBudget = record.budgetBeforeDelete
-                displayedBudget = budget.currentBudget
-            }
-        }
-        context.insert(record.expense)
-        do {
-            try context.save()
-            loadInitialExpenses()
-        } catch {
-            print("Error undoing delete: \(error)")
-        }
-    }
-    
     func markAsPaid(_ expense: Expense) {
-        guard let context = modelContext, let budget = budgets.first else {
-            expense.isPaid = true
-            return
-        }
-        withAnimation(.spring()) {
+        guard let budget = budgets.first else { return }
+        
+        do {
             expense.isPaid = true
             budget.currentBudget -= expense.amount
             displayedBudget = budget.currentBudget
-        }
-        do {
-            try context.save()
+            
+            try expenseService.updateExpense(expense)
+            try budgetService.updateBudget(budget)
         } catch {
             print("Error marking as paid: \(error)")
         }
     }
     
-    func saveExpense(_ expense: Expense) {
-        guard let context = modelContext else { return }
-        context.insert(expense)
+    func undoLastDelete() {
+        guard let record = undoStack.popLast(),
+              let budget = budgets.first else { return }
+        
         do {
-            try context.save()
-            // Add haptic feedback
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
+            if record.wasPaid {
+                budget.currentBudget = record.budgetBeforeDelete
+                displayedBudget = budget.currentBudget
+                try budgetService.updateBudget(budget)
+            }
             
-            // Update displayed expenses
-            loadInitialExpenses()
+            try expenseService.createExpense(record.expense)
         } catch {
-            print("Error saving expense: \(error)")
+            print("Error undoing delete: \(error)")
         }
     }
+    
+    func calculateWeeklyTotals() -> [DailyTotal] {
+        let calendar = Calendar.current
+        let selectedDate = calendar.startOfDay(for: dateRange)
+        
+        var weekStart = selectedDate
+        weekStart = calendar.date(byAdding: .day, value: weekOffset * 7, to: weekStart)!
+        while calendar.component(.weekday, from: weekStart) != 2 { // 2 is Monday
+            weekStart = calendar.date(byAdding: .day, value: -1, to: weekStart)!
+        }
+        
+        var dailyTotals: [DailyTotal] = []
+        
+        for dayOffset in 0...6 {
+            guard let date = calendar.date(byAdding: .day, value: dayOffset, to: weekStart) else { continue }
+            let dayTotal = filteredExpenses
+                .filter { calendar.isDate($0.date, inSameDayAs: date) }
+                .reduce(0) { $0 + $1.amount }
+            dailyTotals.append(DailyTotal(date: date, total: dayTotal))
+        }
+        
+        return dailyTotals
+    }
+    
+    func previousWeek() {
+        weekOffset -= 1
+    }
+    
+    func nextWeek() {
+        weekOffset += 1
+    }
+    
+    func resetToCurrentWeek() {
+        weekOffset = 0
+    }
+}
+
+private struct DeletedExpenseRecord {
+    let expense: Expense
+    let wasPaid: Bool
+    let budgetBeforeDelete: Double
 }

@@ -6,6 +6,9 @@ struct ExpenseLoggingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    private let expenseService: ExpenseServiceProtocol
+    private let budgetService: BudgetServiceProtocol
+
     @Query private var budgets: [Budget]
     @Query private var allSuppliers: [Supplier]
 
@@ -14,182 +17,47 @@ struct ExpenseLoggingView: View {
     @State private var amount: Double? = nil
     @State private var isPaid = true
     @State private var date = Date()
+    @State private var category: ExpenseCategory = .food
+    @State private var showDatePicker = false
     @FocusState private var amountFocused: Bool
 
-    @State private var isPresentingCamera = false
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var selectedImage: UIImage? = nil
-
     @State private var formError: String? = nil
     @State private var showSuggestions = false
-    @State private var showCustomCamera = false
+
+    private let dateFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateStyle = .medium
+        df.timeStyle = .none
+        return df
+    }()
+
+    init(modelContext: ModelContext) {
+        self.expenseService = ExpenseService(modelContext: modelContext)
+        self.budgetService = BudgetService(modelContext: modelContext)
+    }
 
     private var trimmedSupplierName: String {
         supplierName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
-
-                VStack {
-                    Form {
-                        Section("Supplier (Required)") {
-                            TextField("Supplier", text: $supplierName)
-                                .onChange(of: supplierName) { _oldValue, newValue in
-                                    // Keep only letters and spaces, and trim whitespace.
-                                    supplierName = newValue
-                                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                                        .filter { $0.isLetter || $0.isWhitespace }
-                                    updateValidation()
-                                    showSuggestions = !supplierName.isEmpty
-                                }
-                                .onTapGesture {
-                                    if !supplierName.isEmpty { showSuggestions = true }
-                                }
-                            
-                            if showSuggestions && !suggestedSuppliers.isEmpty {
-                                VStack(alignment: .leading, spacing: 0) {
-                                    Text("Suggested Suppliers")
-                                        .font(.subheadline)
-                                        .foregroundColor(.gray)
-                                        .padding(.vertical, 4)
-                                    ForEach(suggestedSuppliers) { sup in
-                                        HStack {
-                                            Text(sup.name)
-                                            Spacer()
-                                        }
-                                        .padding(.vertical, 8)
-                                        .contentShape(Rectangle())
-                                        .onTapGesture {
-                                            supplierName = sup.name
-                                            formError = nil
-                                            showSuggestions = false
-                                        }
-                                        Divider()
-                                    }
-                                }
-                                .transition(.opacity)
-                            }
-                        }
-
-                        Section("Expense Info") {
-                            TextField("Details (Optional)", text: $details)
-                            TextField("Amount", value: $amount, format: .number)
-                                .keyboardType(.decimalPad)
-                                .focused($amountFocused)
-                                .onChange(of: amount) { _oldValue, _newValue in
-                                    updateValidation()
-                                }
-                            
-                            Toggle("Paid?", isOn: $isPaid)
-                                .onChange(of: isPaid) { _oldValue, _newValue in
-                                    updateValidation()
-                                }
-                            
-                            DatePicker("Date", selection: $date, displayedComponents: .date)
-                        }
-
-                        Section("Photo (Optional)") {
-                            if let image = selectedImage {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(maxHeight: 200)
-                            }
-                            PhotosPicker("Select Photo", selection: $selectedPhotoItem, matching: .images)
-                            .onChange(of: selectedPhotoItem) { _oldItem, newItem in
-                                    Task {
-                                        if let data = try? await newItem?.loadTransferable(type: Data.self),
-                                           let uiImage = UIImage(data: data) {
-                                            selectedImage = uiImage
-                                        }
-                                    }
-                                }
-                            
-                            Button("Take Photo") {
-                                guard !isPresentingCamera else { return }
-                                showCustomCamera = true
-                                isPresentingCamera = true
-                            }
-                        }
-                        .disabled(isPresentingCamera)
-
-                        if let error = formError {
-                            Text(error)
-                                .foregroundColor(.red)
-                                .font(.footnote)
-                        }
-                    }
-                    .scrollContentBackground(.hidden)
-                    .listStyle(.insetGrouped)
-                }
-                .navigationTitle("Add Expense")
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Cancel") {
-                            withAnimation(.easeInOut) {
-                                handleDismiss()
-                            }
-                        }
-                    }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Save") {
-                            Task {
-                                // Check that the form is valid and amount is available.
-                                if isFormValid, let validAmount = amount {
-                                    let trimmedSupplier = trimmedSupplierName
-                                    let supplierToUse = getOrCreateSupplier(trimmedSupplier)
-                                    
-                                    // Adjust the budget if the expense is paid.
-                                    if isPaid, let budget = budgets.first {
-                                        budget.currentBudget -= validAmount
-                                    }
-                                    
-                                    // Create the new expense.
-                                    let newExpense = Expense(details: details, date: date, amount: validAmount, isPaid: isPaid)
-                                    newExpense.supplier = supplierToUse
-                                    
-                                    if let selectedImage {
-                                        newExpense.photoData = selectedImage.jpegData(compressionQuality: 0.8)
-                                    }
-                                    
-                                    modelContext.insert(newExpense)
-                                    do {
-                                        try modelContext.save()
-                                        handleDismiss()
-                                    } catch {
-                                        formError = "Failed to save the expense. Please try again: \(error.localizedDescription)"
-                                        print("Save error: \(error)")
-                                    }
-                                }
-                            }
-                        }
-                        .disabled(!isFormValid)
-                        .buttonStyle(.borderedProminent)
-                    }
-                }
-            }
-            .task { updateValidation() }
-        }
-    }
-
-    // MARK: - Supplier Suggestions
+    
     private var suggestedSuppliers: [Supplier] {
         let lower = supplierName.lowercased()
         guard !lower.isEmpty else { return [] }
-        let filteredSuppliers = allSuppliers.filter {
-            $0.name.lowercased().contains(lower)
-        }
-        return Array(filteredSuppliers.prefix(10))
+        return allSuppliers
+            .filter { $0.name.lowercased().contains(lower) }
+            .prefix(5)
+            .map { $0 }
+    }
+    
+    private var isFormValid: Bool {
+        !trimmedSupplierName.isEmpty && amount != nil && (amount ?? 0) > 0
     }
 
-    // MARK: - Validation
     private func updateValidation() {
         if trimmedSupplierName.isEmpty {
-            formError = "Supplier name is required and cannot contain only whitespace."
+            formError = "Supplier name is required."
             return
         }
         guard let validAmount = amount, validAmount > 0 else {
@@ -198,32 +66,299 @@ struct ExpenseLoggingView: View {
         }
         formError = nil
     }
-
-    private var isFormValid: Bool {
-        !trimmedSupplierName.isEmpty && amount != nil && (amount ?? 0) > 0
-    }
-
-    // MARK: - Saving Helper
-    private func performSave() {
-        // Now handled within the Task in the Save button.
-    }
-
+    
     private func getOrCreateSupplier(_ name: String) -> Supplier {
         if let existingSupplier = allSuppliers.first(where: { $0.name.lowercased() == name.lowercased() }) {
             return existingSupplier
-        } else {
-            let newSupplier = Supplier(name: name)
-            modelContext.insert(newSupplier)
-            return newSupplier
         }
+        let newSupplier = Supplier(name: name)
+        modelContext.insert(newSupplier)
+        return newSupplier
     }
 
-    // MARK: - Budget Adjustments
-    private func handleBudgetAdjustment(amount: Double) {
-        // Now handled within the Task in the Save button.
-    }
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 4) {
+                    // MARK: - Supplier Section
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("SUPPLIER")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                        
+                        TextField("Supplier", text: $supplierName)
+                            .font(.title3)
+                            .textInputAutocapitalization(.words)
+                            .onChange(of: supplierName) { _, newValue in
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    supplierName = newValue
+                                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                                        .filter { $0.isLetter || $0.isWhitespace }
+                                    updateValidation()
+                                    showSuggestions = !supplierName.isEmpty
+                                }
+                            }
+                            .padding(.bottom, 4)
 
-    private func handleDismiss() {
-        dismiss()
+                        if let error = formError {
+                            Text(error)
+                                .foregroundColor(.red)
+                                .font(.footnote)
+                                .padding(.bottom, 4)
+                        }
+                    }
+                    .padding(.horizontal)
+
+                    Divider()
+                        .padding(.horizontal)
+                        .opacity(showSuggestions ? 0 : 1)
+
+                    if !suggestedSuppliers.isEmpty && showSuggestions {
+                        VStack(spacing: 1) {
+                            ForEach(suggestedSuppliers) { supplier in
+                                Button(action: {
+                                    supplierName = supplier.name
+                                    showSuggestions = false
+                                    updateValidation()
+                                }) {
+                                    HStack(spacing: 0) {
+                                        Rectangle()
+                                            .fill(Color.categoryColor(for: category))
+                                            .frame(width: 4)
+                                        
+                                        Text(supplier.name)
+                                            .font(.body)
+                                            .foregroundStyle(.primary)
+                                            .padding(.horizontal, 16)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .frame(height: 44)
+                                    }
+                                    .frame(height: 44)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .background(Color(.systemBackground))
+                                .overlay(alignment: .bottom) {
+                                    if supplier.id != suggestedSuppliers.last?.id {
+                                        Divider()
+                                            .padding(.leading, 4)
+                                    }
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        let generator = UIImpactFeedbackGenerator(style: .rigid)
+                                        generator.impactOccurred()
+                                        withAnimation {
+                                            modelContext.delete(supplier)
+                                            try? modelContext.save()
+                                            showSuggestions = false
+                                        }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                    .tint(.red)
+                                }
+                            }
+                        }
+                        .background(Color(.systemGray6))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal)
+                        .padding(.top, 4)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                    
+                    // MARK: - Details Section
+                    VStack(spacing: 0) {
+                        // Category
+                        NavigationLink {
+                            List(ExpenseCategory.allCases, id: \.self) { cat in
+                                Button {
+                                    category = cat
+                                    dismiss()
+                                } label: {
+                                    HStack {
+                                        Text(cat.rawValue)
+                                        Spacer()
+                                        if cat == category {
+                                            Image(systemName: "checkmark")
+                                                .foregroundStyle(.blue)
+                                        }
+                                    }
+                                }
+                            }
+                            .navigationTitle("Category")
+                            .navigationBarTitleDisplayMode(.inline)
+                        } label: {
+                            HStack {
+                                Rectangle()
+                                    .fill(Color.categoryColor(for: category))
+                                    .frame(width: 4, height: 44)
+                                
+                                HStack {
+                                    Text("Category")
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                    Text(category.rawValue)
+                                        .foregroundStyle(.secondary)
+                                    Image(systemName: "chevron.right")
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Divider()
+                            .padding(.leading, 4)
+                        
+                        // Details
+                        TextField("Details", text: $details)
+                            .font(.title3)
+                            .padding(.horizontal)
+                            .frame(height: 44)
+                        
+                        Divider()
+                            .padding(.leading, 4)
+                        
+                        // Amount
+                        HStack {
+                            TextField("Amount", value: $amount, format: .number)
+                                .keyboardType(.decimalPad)
+                                .focused($amountFocused)
+                                .onChange(of: amount) { _, _ in updateValidation() }
+                                .font(.title3)
+                            Spacer()
+                            Text("IQD")
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal)
+                        .frame(height: 44)
+                        
+                        Divider()
+                            .padding(.leading, 4)
+                        
+                        // Paid Toggle
+                        HStack {
+                            HStack {
+                                Text("Paid")
+                                if isPaid {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                }
+                            }
+                            Spacer()
+                            Toggle("", isOn: $isPaid)
+                        }
+                        .padding(.horizontal)
+                        .frame(height: 44)
+                        
+                        Divider()
+                            .padding(.leading, 4)
+                        
+                        // Date
+                        Button {
+                            showDatePicker.toggle()
+                        } label: {
+                            HStack {
+                                Text("Date")
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                Text(dateFormatter.string(from: date))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal)
+                            .frame(height: 44)
+                        }
+                        .sheet(isPresented: $showDatePicker) {
+                            NavigationStack {
+                                DatePicker("Select Date", selection: $date, displayedComponents: .date)
+                                    .datePickerStyle(.graphical)
+                                    .navigationTitle("Select Date")
+                                    .navigationBarTitleDisplayMode(.inline)
+                                    .toolbar {
+                                        ToolbarItem(placement: .confirmationAction) {
+                                            Button("Done") {
+                                                showDatePicker = false
+                                            }
+                                        }
+                                    }
+                            }
+                            .presentationDetents([.height(400)])
+                        }
+                    }
+                    .background(Color(.systemBackground))
+                    
+                    // MARK: - Photo Section
+                    if let image = selectedImage {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 200)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal)
+                    }
+                    
+                    PhotosPicker("Select Photo", selection: $selectedPhotoItem, matching: .images)
+                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal)
+                        .onChange(of: selectedPhotoItem) { _, newItem in
+                            Task {
+                                if let data = try? await newItem?.loadTransferable(type: Data.self),
+                                   let uiImage = UIImage(data: data) {
+                                    selectedImage = uiImage
+                                }
+                            }
+                        }
+                }
+                .padding(.vertical)
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Add Expense")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        Task {
+                            guard isFormValid, let validAmount = amount else { return }
+                            let supplierToUse = getOrCreateSupplier(trimmedSupplierName)
+                            
+                            do {
+                                if isPaid, let budget = try budgetService.getCurrentBudget() {
+                                    budget.currentBudget -= validAmount
+                                    try budgetService.updateBudget(budget)
+                                }
+                                
+                                let newExpense = Expense(
+                                    details: details,
+                                    date: date,
+                                    amount: validAmount,
+                                    isPaid: isPaid,
+                                    category: category
+                                )
+                                newExpense.supplier = supplierToUse
+                                
+                                if let selectedImage {
+                                    newExpense.photoData = selectedImage.jpegData(compressionQuality: 0.8)
+                                }
+                                
+                                try expenseService.createExpense(newExpense)
+                                dismiss()
+                            } catch {
+                                formError = "Failed to save: \(error.localizedDescription)"
+                            }
+                        }
+                    }
+                    .disabled(!isFormValid)
+                }
+            }
+            .task { updateValidation() }
+        }
     }
 }
