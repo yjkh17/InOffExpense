@@ -184,12 +184,10 @@ private struct ExpenseRow: View {
     let expense: Expense
     let onDelete: (Expense) -> Void
     let onMarkAsPaid: (Expense) -> Void
-    @State private var showEditSheet = false
     
     var body: some View {
-        Button {
-            print("Tapped expense: \(expense.details)")
-            showEditSheet = true
+        NavigationLink {
+            ExpenseEditingView(expense: expense)
         } label: {
             HStack(spacing: 0) {
                 Rectangle()
@@ -232,9 +230,6 @@ private struct ExpenseRow: View {
             .shadow(color: .black.opacity(0.06), radius: 5, x: 0, y: 2)
         }
         .buttonStyle(.plain)
-        .sheet(isPresented: $showEditSheet) {
-            ExpenseEditingView(expense: expense)
-        }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
                 let generator = UIImpactFeedbackGenerator(style: .rigid)
