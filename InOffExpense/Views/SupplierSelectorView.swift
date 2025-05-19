@@ -13,7 +13,7 @@ struct SupplierSelectorView: View {
     @State private var newSupplierName: String = ""
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 Section("Choose Existing Supplier") {
                     ForEach(suppliers) { supplier in
