@@ -18,6 +18,7 @@ InOffExpense is an iOS application for tracking business expenses. It lets you l
 - Launch the app and tap **+** to log an expense. Provide a supplier name, amount, category and any additional details.
 - Use the dashboard to review recent expenses and your remaining budget.
 - When an expense is marked as paid, small "orb" animations travel from the budget pill to the spent pill to visualize the budget reduction.
+- Swipe left on an expense card to quickly delete it with a full swipe gesture.
 - Navigate through the Statistics view to see charts of your weekly spending.
 
 ## Credits
