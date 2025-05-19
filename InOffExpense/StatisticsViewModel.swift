@@ -17,12 +17,6 @@ final class StatisticsViewModel: ObservableObject {
         case custom = "Custom"
     }
     
-    struct DailyTotal: Identifiable {
-        let id = UUID()
-        let date: Date
-        let total: Double
-    }
-    
     struct CategoryTotal: Identifiable {
         let id = UUID()
         let category: ExpenseCategory
