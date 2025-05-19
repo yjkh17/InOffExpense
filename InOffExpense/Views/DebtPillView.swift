@@ -8,7 +8,8 @@ struct DebtPillView: View {
             .font(.title3.bold())
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .foregroundColor(debt > 1000 ? .white : .white)
+            // Use white text for high debt and black for low debt
+            .foregroundColor(debt > 1000 ? .white : .black)
             .background(Color.red)
             .clipShape(Capsule())
     }
