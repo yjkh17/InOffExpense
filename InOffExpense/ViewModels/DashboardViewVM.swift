@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import os
 
 @MainActor
 final class DashboardViewVM: ObservableObject {
@@ -17,6 +18,7 @@ final class DashboardViewVM: ObservableObject {
     private let expenseService: ExpenseServiceProtocol
     private let budgetService: BudgetServiceProtocol
     private var undoStack: [DeletedExpenseRecord] = []
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "InOffExpense", category: "DashboardViewVM")
     
     @Published var allExpenses: [Expense] = []
     @Published var budgets: [Budget] = []
@@ -55,7 +57,7 @@ final class DashboardViewVM: ObservableObject {
             let budget = try budgetService.createDefaultBudget()
             displayedBudget = budget.currentBudget
         } catch {
-            print("Error creating default budget: \(error)")
+            logger.error("Error creating default budget: \(error.localizedDescription)")
         }
     }
     
@@ -75,7 +77,7 @@ final class DashboardViewVM: ObservableObject {
             undoStack.append(record)
             showUndoBanner = true
         } catch {
-            print("Error deleting expense: \(error)")
+            logger.error("Error deleting expense: \(error.localizedDescription)")
         }
     }
     
@@ -90,7 +92,7 @@ final class DashboardViewVM: ObservableObject {
             try expenseService.updateExpense(expense)
             try budgetService.updateBudget(budget)
         } catch {
-            print("Error marking as paid: \(error)")
+            logger.error("Error marking as paid: \(error.localizedDescription)")
         }
     }
     
@@ -107,7 +109,7 @@ final class DashboardViewVM: ObservableObject {
             
             try expenseService.createExpense(record.expense)
         } catch {
-            print("Error undoing delete: \(error)")
+            logger.error("Error undoing delete: \(error.localizedDescription)")
         }
     }
     

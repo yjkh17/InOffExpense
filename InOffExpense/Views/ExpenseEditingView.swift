@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import os
 
 struct ExpenseEditingView: View {
     @Environment(\.modelContext) private var modelContext
@@ -10,6 +11,7 @@ struct ExpenseEditingView: View {
     @State private var originalAmount: Double
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showCategoryPicker = false
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "InOffExpense", category: "ExpenseEditingView")
 
     init(expense: Expense) {
         self.expense = expense
@@ -116,7 +118,7 @@ struct ExpenseEditingView: View {
             NotificationCenter.default.post(name: Notification.Name("ExpenseUpdated"), object: nil)
             dismiss()
         } catch {
-            print("Error saving edited expense: \(error)")
+            logger.error("Error saving edited expense: \(error.localizedDescription)")
         }
     }
 }
