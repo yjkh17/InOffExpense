@@ -22,3 +22,8 @@ InOffExpense is an iOS application for tracking business expenses. It lets you l
 ## Credits
 
 Developed by [yjkh17](https://github.com/yjkh17). Icons and other assets belong to their respective owners.
+
+## License
+
+This project is licensed under the terms of the [MIT License](LICENSE).
+=======
