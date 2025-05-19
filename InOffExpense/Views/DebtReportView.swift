@@ -22,7 +22,7 @@ struct DebtReportView: View {
     )
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 backgroundGradient
                     .ignoresSafeArea()
