@@ -3,6 +3,8 @@ import SwiftUI
 /// Small capsule that shows the current available budget.
 struct BudgetPillView: View {
     let budget: Double
+    var showOrb: Bool = false
+    var namespace: Namespace.ID?
     
     private var formattedBudget: String {
         let formatter = NumberFormatter()
@@ -33,5 +35,13 @@ struct BudgetPillView: View {
         .clipShape(Capsule())
         .overlay(Capsule().stroke(Color.white.opacity(0.5), lineWidth: 1))
         .shadow(color: Color.purple.opacity(0.3), radius: 6, x: 3, y: 3)
+        .overlay(alignment: .trailing) {
+            if showOrb, let ns = namespace {
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 8, height: 8)
+                    .matchedGeometryEffect(id: "budgetOrb", in: ns)
+            }
+        }
     }
 }

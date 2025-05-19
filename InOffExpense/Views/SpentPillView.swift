@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SpentPillView: View {
     let spent: Double
+    var showOrb: Bool = false
+    var namespace: Namespace.ID?
     
     private var formattedSpent: String {
         let formatter = NumberFormatter()
@@ -32,5 +34,13 @@ struct SpentPillView: View {
         .clipShape(Capsule())
         .overlay(Capsule().stroke(Color.white.opacity(0.5), lineWidth: 1))
         .shadow(color: Color.orange.opacity(0.4), radius: 8, x: 0, y: 4)
+        .overlay(alignment: .leading) {
+            if showOrb, let ns = namespace {
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 8, height: 8)
+                    .matchedGeometryEffect(id: "budgetOrb", in: ns)
+            }
+        }
     }
 }

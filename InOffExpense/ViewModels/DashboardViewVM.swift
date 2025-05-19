@@ -14,6 +14,7 @@ final class DashboardViewVM: ObservableObject {
     @Published var fullScreenPhoto: UIImage? = nil
     @Published var weekOffset: Int = 0
     @Published var showDailyReport = false
+    @Published var budgetChangeTrigger = UUID()
     
     private let expenseService: ExpenseServiceProtocol
     private let budgetService: BudgetServiceProtocol
@@ -83,12 +84,13 @@ final class DashboardViewVM: ObservableObject {
     
     func markAsPaid(_ expense: Expense) {
         guard let budget = budgets.first else { return }
-        
+
         do {
             expense.isPaid = true
             budget.currentBudget -= expense.amount
             displayedBudget = budget.currentBudget
-            
+            budgetChangeTrigger = UUID()
+
             try expenseService.updateExpense(expense)
             try budgetService.updateBudget(budget)
         } catch {

@@ -58,6 +58,7 @@ struct DashboardView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 HeaderView(
+                    viewModel: viewModel,
                     budget: budgets.first?.currentBudget ?? 0,
                     spent: viewModel.dailySpent
                 )
@@ -105,13 +106,42 @@ struct DashboardView: View {
 // MARK: - Subviews
 
 private struct HeaderView: View {
+    @ObservedObject var viewModel: DashboardViewVM
     let budget: Double
     let spent: Double
+    @Namespace private var orbNamespace
+    @State private var orbVisible = false
+    @State private var animateOrb = false
     
     var body: some View {
         HStack(spacing: 12) {
-            BudgetPillView(budget: budget)
-            SpentPillView(spent: spent)
+            BudgetPillView(
+                budget: budget,
+                showOrb: orbVisible && !animateOrb,
+                namespace: orbNamespace
+            )
+            SpentPillView(
+                spent: spent,
+                showOrb: orbVisible && animateOrb,
+                namespace: orbNamespace
+            )
+        }
+        .onChange(of: viewModel.budgetChangeTrigger) { _ in
+            startOrbAnimation()
+        }
+    }
+
+    private func startOrbAnimation() {
+        orbVisible = true
+        animateOrb = false
+        withAnimation(.easeInOut(duration: 0.5)) {
+            animateOrb = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                orbVisible = false
+            }
+            animateOrb = false
         }
     }
 }
