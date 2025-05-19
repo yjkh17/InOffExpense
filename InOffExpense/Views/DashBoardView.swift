@@ -33,7 +33,7 @@ struct DashboardView: View {
                 )
                 
                 // MARK: - Content Section
-                if allExpenses.isEmpty { 
+                if allExpenses.isEmpty {
                     EmptyStateView(
                         title: "No expenses yet",
                         subtitle: "Tap the + button to add your first expense",
@@ -130,7 +130,7 @@ private struct HeaderView: View {
             startOrbAnimation()
         }
     }
-
+    
     private func startOrbAnimation() {
         orbVisible = true
         animateOrb = false
@@ -214,7 +214,7 @@ private struct ExpenseRow: View {
     let expense: Expense
     let onDelete: (Expense) -> Void
     let onMarkAsPaid: (Expense) -> Void
-    
+
     var body: some View {
         ZStack {
             NavigationLink {
@@ -290,10 +290,52 @@ private struct ExpenseRow: View {
                     }
                 }
             } label: {
-                Label(expense.isPaid ? "Paid" : "Mark as Paid", 
+                Label(expense.isPaid ? "Paid" : "Mark as Paid",
                       systemImage: expense.isPaid ? "checkmark.circle.fill" : "checkmark.circle")
             }
             .tint(expense.isPaid ? .gray : .green)
         }
+    }
+    
+    private var rowContent: some View {
+        HStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.categoryColor(for: expense.category))
+                .frame(width: 4)
+            
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(expense.supplier?.name ?? "Unknown Supplier")
+                        .font(.headline)
+                    Text(expense.details)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text(expense.date.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("\(Int(expense.amount)) IQD")
+                        .font(.headline)
+                        .foregroundStyle(expense.isPaid ? .green : .primary)
+                    
+                    Text(expense.category.rawValue)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Color(.systemGray6))
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+        }
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.06), radius: 5, x: 0, y: 2)
     }
 }
