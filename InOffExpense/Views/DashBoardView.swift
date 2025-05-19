@@ -33,7 +33,7 @@ struct DashboardView: View {
                 )
                 
                 // MARK: - Content Section
-                if allExpenses.isEmpty { 
+                if allExpenses.isEmpty {
                     EmptyStateView(
                         title: "No expenses yet",
                         subtitle: "Tap the + button to add your first expense",
@@ -130,7 +130,7 @@ private struct HeaderView: View {
             startOrbAnimation()
         }
     }
-
+    
     private func startOrbAnimation() {
         orbVisible = true
         animateOrb = false
@@ -214,7 +214,7 @@ private struct ExpenseRow: View {
     let expense: Expense
     let onDelete: (Expense) -> Void
     let onMarkAsPaid: (Expense) -> Void
-
+    
     var body: some View {
         ZStack {
             NavigationLink {
@@ -223,7 +223,7 @@ private struct ExpenseRow: View {
                 EmptyView()
             }
             .opacity(0)
-
+            
             rowContent
         }
         .contentShape(Rectangle())
@@ -257,13 +257,13 @@ private struct ExpenseRow: View {
             .tint(expense.isPaid ? .gray : .green)
         }
     }
-
+    
     private var rowContent: some View {
         HStack(spacing: 0) {
             Rectangle()
                 .fill(Color.categoryColor(for: expense.category))
                 .frame(width: 4)
-
+            
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(expense.supplier?.name ?? "Unknown Supplier")
@@ -275,14 +275,14 @@ private struct ExpenseRow: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-
+                
                 Spacer()
-
+                
                 VStack(alignment: .trailing, spacing: 4) {
                     Text("\(Int(expense.amount)) IQD")
                         .font(.headline)
                         .foregroundStyle(expense.isPaid ? .green : .primary)
-
+                    
                     Text(expense.category.rawValue)
                         .font(.caption)
                         .foregroundStyle(.secondary)
