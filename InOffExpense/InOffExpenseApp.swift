@@ -3,9 +3,12 @@ import SwiftData
 
 @main
 struct InOffExpenseApp: App {
-    let modelContainer: ModelContainer
-    
+    let modelContainer: ModelContainer?
+    @State private var initializationError: Error?
+
     init() {
+        var container: ModelContainer?
+        var initError: Error?
         do {
             let schema = Schema([
                 Expense.self,
@@ -18,28 +21,48 @@ struct InOffExpenseApp: App {
                 isStoredInMemoryOnly: false
             )
             
-            let container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            container = try ModelContainer(for: schema, configurations: [modelConfiguration])
             
             // Create initial budget if needed
-            let context = container.mainContext
-            let budgetDescriptor = FetchDescriptor<Budget>()
-            if (try? context.fetch(budgetDescriptor))?.isEmpty ?? true {
-                let budget = Budget(currentBudget: 1_000_000)
-                context.insert(budget)
-                try context.save()
+            if let container = container {
+                let context = container.mainContext
+                let budgetDescriptor = FetchDescriptor<Budget>()
+                if (try? context.fetch(budgetDescriptor))?.isEmpty ?? true {
+                    let budget = Budget(currentBudget: 1_000_000)
+                    context.insert(budget)
+                    try context.save()
+                }
             }
-            
+
             self.modelContainer = container
-            
+
         } catch {
-            fatalError("Could not initialize ModelContainer: \(error)")
+            self.modelContainer = nil
+            initError = error
         }
+
+        _initializationError = State(initialValue: initError)
     }
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .modelContainer(modelContainer)
+            Group {
+                if let container = modelContainer {
+                    ContentView()
+                        .modelContainer(container)
+                } else {
+                    Text("Unable to start application.")
+                }
+            }
+            .alert("Initialization Error",
+                   isPresented: Binding(
+                    get: { initializationError != nil },
+                    set: { if !$0 { initializationError = nil } }
+                   )) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(initializationError?.localizedDescription ?? "")
+            }
         }
     }
 }
