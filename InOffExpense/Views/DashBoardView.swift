@@ -214,19 +214,57 @@ private struct ExpenseRow: View {
     let expense: Expense
     let onDelete: (Expense) -> Void
     let onMarkAsPaid: (Expense) -> Void
-    
+
     var body: some View {
         ZStack {
-            NavigationLink {
-                ExpenseEditingView(expense: expense)
-            } label: {
+            // Hidden navigation link so the row remains swipeable
+            NavigationLink(destination: ExpenseEditingView(expense: expense)) {
                 EmptyView()
             }
             .opacity(0)
-            
-            rowContent
+
+            HStack(spacing: 0) {
+                Rectangle()
+                    .fill(Color.categoryColor(for: expense.category))
+                    .frame(width: 4)
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(expense.supplier?.name ?? "Unknown Supplier")
+                            .font(.headline)
+                        Text(expense.details)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text(expense.date.formatted(date: .abbreviated, time: .omitted))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("\(Int(expense.amount)) IQD")
+                            .font(.headline)
+                            .foregroundStyle(expense.isPaid ? .green : .primary)
+                        
+                        Text(expense.category.rawValue)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Color(.systemGray6))
+                            .clipShape(Capsule())
+                    }
+                }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
+            }
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.06), radius: 5, x: 0, y: 2)
+            .contentShape(Rectangle())
         }
-        .contentShape(Rectangle())
+        .buttonStyle(.plain)
         // Allow a full swipe gesture to immediately delete the expense card
         // without requiring the user to tap the Delete button.
         .swipeActions(edge: .trailing) {
