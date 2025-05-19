@@ -216,14 +216,19 @@ private struct ExpenseRow: View {
     let onMarkAsPaid: (Expense) -> Void
     
     var body: some View {
-        NavigationLink {
-            ExpenseEditingView(expense: expense)
-        } label: {
+        ZStack {
+            NavigationLink {
+                ExpenseEditingView(expense: expense)
+            } label: {
+                EmptyView()
+            }
+            .opacity(0)
+
             HStack(spacing: 0) {
                 Rectangle()
                     .fill(Color.categoryColor(for: expense.category))
                     .frame(width: 4)
-                
+
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(expense.supplier?.name ?? "Unknown Supplier")
@@ -235,14 +240,14 @@ private struct ExpenseRow: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
-                    
+
                     Spacer()
-                    
+
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("\(Int(expense.amount)) IQD")
                             .font(.headline)
                             .foregroundStyle(expense.isPaid ? .green : .primary)
-                        
+
                         Text(expense.category.rawValue)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -258,9 +263,12 @@ private struct ExpenseRow: View {
             .background(Color(.systemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.06), radius: 5, x: 0, y: 2)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+        // Allow a full swipe gesture to immediately delete the expense card
+        // without requiring the user to tap the Delete button.
+        .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
                 let generator = UIImpactFeedbackGenerator(style: .rigid)
                 generator.impactOccurred()
