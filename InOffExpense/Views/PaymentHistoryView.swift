@@ -12,7 +12,7 @@ struct PaymentHistoryView: View {
     @Query var payments: [Payment]
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 ForEach(payments, id: \.id) { payment in
                     HStack {
