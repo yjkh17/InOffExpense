@@ -260,7 +260,9 @@ private struct ExpenseRow: View {
             .shadow(color: .black.opacity(0.06), radius: 5, x: 0, y: 2)
         }
         .buttonStyle(.plain)
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+        // Allow a full swipe gesture to immediately delete the expense card
+        // without requiring the user to tap the Delete button.
+        .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
                 let generator = UIImpactFeedbackGenerator(style: .rigid)
                 generator.impactOccurred()
