@@ -126,7 +126,7 @@ private struct HeaderView: View {
                 namespace: orbNamespace
             )
         }
-        .onChange(of: viewModel.budgetChangeTrigger) { _ in
+        .onChange(of: viewModel.budgetChangeTrigger) { oldValue, newValue in
             startOrbAnimation()
         }
     }
