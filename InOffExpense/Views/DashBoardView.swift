@@ -217,8 +217,9 @@ private struct ExpenseRow: View {
 
     var body: some View {
         ZStack {
-            // Hidden navigation link so the row remains swipeable
-            NavigationLink(destination: ExpenseEditingView(expense: expense)) {
+            NavigationLink {
+                ExpenseEditingView(expense: expense)
+            } label: {
                 EmptyView()
             }
             .opacity(0)
@@ -239,14 +240,14 @@ private struct ExpenseRow: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
-                    
+
                     Spacer()
-                    
+
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("\(Int(expense.amount)) IQD")
                             .font(.headline)
                             .foregroundStyle(expense.isPaid ? .green : .primary)
-                        
+
                         Text(expense.category.rawValue)
                             .font(.caption)
                             .foregroundStyle(.secondary)
